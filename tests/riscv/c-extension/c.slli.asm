@@ -1,0 +1,53 @@
+.lang riscv32
+.org 0x0
+
+c.slli ra, #0
+c.slli ra, #1
+c.slli ra, #2
+c.slli ra, #4
+c.slli ra, #8
+c.slli ra, #16
+c.slli ra, #31
+c.slli t0, #0
+c.slli t0, #1
+c.slli t0, #2
+c.slli t0, #4
+c.slli t0, #8
+c.slli t0, #16
+c.slli t0, #31
+c.slli a0, #0
+c.slli a0, #1
+c.slli a0, #2
+c.slli a0, #4
+c.slli a0, #8
+c.slli a0, #16
+c.slli a0, #31
+c.slli a5, #0
+c.slli a5, #1
+c.slli a5, #2
+c.slli a5, #4
+c.slli a5, #8
+c.slli a5, #16
+c.slli a5, #31
+c.slli s4, #0
+c.slli s4, #1
+c.slli s4, #2
+c.slli s4, #4
+c.slli s4, #8
+c.slli s4, #16
+c.slli s4, #31
+c.slli s9, #0
+c.slli s9, #1
+c.slli s9, #2
+c.slli s9, #4
+c.slli s9, #8
+c.slli s9, #16
+c.slli s9, #31
+c.slli t6, #0
+c.slli t6, #1
+c.slli t6, #2
+c.slli t6, #4
+c.slli t6, #8
+c.slli t6, #16
+c.slli t6, #31
+

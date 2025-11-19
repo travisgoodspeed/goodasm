@@ -1,0 +1,10 @@
+Colliding matches:  "c.jalr c.add "
+1:  "c.jalr a0"
+2:  "c.add a0, a1"
+Colliding matches:  "c.jalr c.add "
+1:  "c.jalr a0"
+2:  "c.add a0, a1"
+Colliding matches:  "c.jalr c.add "
+1:  "c.jalr a0"
+2:  "c.add a0, a1"
+c.jalr a0

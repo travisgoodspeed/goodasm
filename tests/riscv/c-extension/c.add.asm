@@ -1,0 +1,53 @@
+.lang riscv32
+.org 0x0
+
+c.add ra, ra
+c.add ra, t0
+c.add ra, a0
+c.add ra, a5
+c.add ra, s4
+c.add ra, s9
+c.add ra, t6
+c.add t0, ra
+c.add t0, t0
+c.add t0, a0
+c.add t0, a5
+c.add t0, s4
+c.add t0, s9
+c.add t0, t6
+c.add a0, ra
+c.add a0, t0
+c.add a0, a0
+c.add a0, a5
+c.add a0, s4
+c.add a0, s9
+c.add a0, t6
+c.add a5, ra
+c.add a5, t0
+c.add a5, a0
+c.add a5, a5
+c.add a5, s4
+c.add a5, s9
+c.add a5, t6
+c.add s4, ra
+c.add s4, t0
+c.add s4, a0
+c.add s4, a5
+c.add s4, s4
+c.add s4, s9
+c.add s4, t6
+c.add s9, ra
+c.add s9, t0
+c.add s9, a0
+c.add s9, a5
+c.add s9, s4
+c.add s9, s9
+c.add s9, t6
+c.add t6, ra
+c.add t6, t0
+c.add t6, a0
+c.add t6, a5
+c.add t6, s4
+c.add t6, s9
+c.add t6, t6
+

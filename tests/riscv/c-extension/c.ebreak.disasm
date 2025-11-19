@@ -1,0 +1,10 @@
+Colliding matches:  "c.ebreak c.add "
+1:  "c.ebreak"
+2:  "c.add a0, a1"
+Colliding matches:  "c.ebreak c.add "
+1:  "c.ebreak"
+2:  "c.add a0, a1"
+Colliding matches:  "c.ebreak c.add "
+1:  "c.ebreak"
+2:  "c.add a0, a1"
+c.ebreak 

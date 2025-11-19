@@ -73,6 +73,7 @@ set(GOODASM_SOURCES
     galangarm7tdmi.h galangarm7tdmi.cpp
     galangtms320c28x.h galangtms320c28x.cpp
     galangti80.h galangti80.cpp
+    galangriscv32.h galangriscv32.cpp
 )
 
 

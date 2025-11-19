@@ -254,6 +254,14 @@ int main(int argc, char *argv[]){
                                       "TI 80 (broken)"
                                       );
     parser.addOption(langTI80);
+    QCommandLineOption langRISCV(QStringList()<<"riscv",
+                                 "RISCV (alpha)"
+                                 );
+    parser.addOption(langRISCV);
+    QCommandLineOption langRISCV32(QStringList()<<"riscv32",
+                                   "RISCV32 (alpha)"
+                                   );
+    parser.addOption(langRISCV32);
 
 
 
@@ -304,6 +312,10 @@ int main(int argc, char *argv[]){
         language="tms320c28x";
     else if(parser.isSet(langTI80))
         language="ti80";
+    else if(parser.isSet(langRISCV))
+        language="riscv32";
+    else if(parser.isSet(langRISCV32))
+        language="riscv32";
 
     //We allocate this dynamically to test that we free properly.
     GoodASM *goodasm=new GoodASM(language);

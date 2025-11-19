@@ -1,0 +1,10 @@
+Colliding matches:  "c.addi16sp c.lui "
+1:  "c.addi16sp #-32"
+2:  "c.lui a0, #0x10000"
+Colliding matches:  "c.addi16sp c.lui "
+1:  "c.addi16sp #-32"
+2:  "c.lui a0, #0x10000"
+Colliding matches:  "c.addi16sp c.lui "
+1:  "c.addi16sp #-32"
+2:  "c.lui a0, #0x10000"
+c.addi16sp #-32

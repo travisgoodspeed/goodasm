@@ -1,0 +1,6 @@
+Colliding matches:  "fence fence "
+1:  "fence"
+2:  "fence #0xFF, zero, zero"
+fence #0x00, zero, zero
+fence #0x0F, zero, zero
+fence 
