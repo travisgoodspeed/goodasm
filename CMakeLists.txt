@@ -11,6 +11,7 @@ find_package(Qt6 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
+set(FETCHCONTENT_UPDATES_DISCONNECTED 1)
 include(FetchContent)
 FetchContent_Declare(replxx GIT_REPOSITORY https://github.com/AmokHuginnsson/replxx.git)
 FetchContent_MakeAvailable(replxx)
