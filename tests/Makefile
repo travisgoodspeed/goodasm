@@ -1,5 +1,9 @@
 
 
+CURDIR:=$(shell pwd)
+BUILD_PATHS:=$(CURDIR)/build:$(CURDIR)/build/Debug:$(CURDIR)/build/Release:$(CURDIR)/scripts
+export PATH:=$(BUILD_PATHS):$(PATH)
+
 all: 
 	make -C ucom43 clean all
 	make -C s2000 clean all

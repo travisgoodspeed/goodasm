@@ -1,0 +1,155 @@
+version: '3'
+
+vars:
+  TARGET: Debug
+
+tasks:
+  install:qt:
+    desc: |
+      Ensure Qt 6 is installed and discoverable by CMake.
+      - Checks for Qt6Config.cmake or cmake --find-package.
+      - Installs via package manager if not found.
+      - On Windows, uses the official Qt installer.
+    cmds:
+      - cmd: >-
+          cmd.exe /c "if exist C:\Qt\6.10.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake (
+            echo Qt6 is already installed and discoverable by CMake.
+          ) else (
+            curl -L -O https://download.qt.io/official_releases/online_installers/qt-online-installer-windows-x64-online.exe
+            qt-online-installer-windows-x64-online.exe --root C:\Qt --accept-licenses --default-answer --confirm-command install qt.qt6.6100.win64_msvc2022_64
+          )"
+        platforms: [windows]
+      - cmd: |
+          if cmake --find-package -DNAME=Qt6 -DCOMPILER_ID=GNU -DLANGUAGE=CXX -DMODE=EXIST 2>/dev/null; then \
+            echo Qt6 is already installed and discoverable by CMake.; \
+          elif [ -f /usr/lib/cmake/Qt6/Qt6Config.cmake ] || [ -f /usr/local/lib/cmake/Qt6/Qt6Config.cmake ] || [ -f /usr/lib/x86_64-linux-gnu/cmake/Qt6/Qt6Config.cmake ]; then \
+            echo Qt6 is already installed and discoverable by CMake.; \
+          else \
+            if command -v apt-get >/dev/null 2>&1; then \
+              if ! dpkg -s qt6-base-dev qt6-declarative-dev >/dev/null 2>&1; then \
+                sudo apt-get update && \
+                sudo apt-get install -y qt6-base-dev qt6-declarative-dev; \
+              else \
+                echo "qt6-base-dev and qt6-declarative-dev are already installed."; \
+              fi; \
+              # Install both 64-bit and 32-bit SDL2 dev packages if available
+              if apt-cache show libsdl2-dev:i386 >/dev/null 2>&1; then \
+                sudo apt-get install -y libsdl2-dev libsdl2-dev:i386; \
+              else \
+                sudo apt-get install -y libsdl2-dev; \
+              fi; \
+            elif command -v brew >/dev/null 2>&1; then \
+              brew install qt6; \
+            else \
+              echo "Please install Qt6 manually."; \
+            fi; \
+          fi
+        platforms: [linux]
+      - cmd: |
+          if [ -d /opt/homebrew ]; then QT_PREFIX=/opt/homebrew/opt/qt; else QT_PREFIX=/usr/local/opt/qt; fi; \
+          if cmake --find-package -DNAME=Qt6 -DCOMPILER_ID=GNU -DLANGUAGE=CXX -DMODE=EXIST -DCMAKE_PREFIX_PATH=${QT_PREFIX} 2>/dev/null; then echo "Qt6 is already installed and discoverable by CMake - Homebrew at ${QT_PREFIX}."; \
+          elif [ -f ${QT_PREFIX}/lib/cmake/Qt6/Qt6Config.cmake ] || [ -f ${QT_PREFIX}/lib/cmake/Qt6/Qt6Config.cmake ]; then echo "Qt6 is already installed and discoverable by CMake - Homebrew at ${QT_PREFIX}."; \
+          else if command -v brew >/dev/null 2>&1; then brew install qt; else echo "Please install Qt6 via Homebrew: brew install qt"; fi; fi
+        platforms: [darwin]
+    ignore_error: false
+
+
+
+  install:deps:
+    desc: Install dependencies (CMake, Qt, Git, NASM, unidasm)
+    cmds:
+      - cmd: |
+          if where /q cmake && where /q git; then \
+            echo CMake and Git are already installed.; \
+          else \
+            cmd /C "winget install -e --id Kitware.CMake" && \
+            cmd /C "winget install -e --id Git.Git"; \
+          fi
+        platforms: [windows]
+      - cmd: |
+          if command -v cmake >/dev/null 2>&1 && command -v git >/dev/null 2>&1 && command -v nasm >/dev/null 2>&1 && command -v unidasm >/dev/null 2>&1; then \
+            echo CMake, Git, NASM, and unidasm are already installed.; \
+          else \
+            if command -v apt-get >/dev/null 2>&1; then \
+              sudo apt-get update && \
+              sudo apt-get install -y cmake git nasm || echo "not available in apt repo"; \
+            elif command -v brew >/dev/null 2>&1; then \
+              brew install cmake git nasm || echo "not available in brew repo"; \
+            else \
+              echo "Please install cmake, git, nasm manually."; \
+            fi; \
+            make unidasm; \
+          fi
+        platforms: [darwin, linux]
+    ignore_error: true
+
+  build:cmake:
+    desc: |
+      Build the project (Windows: native, POSIX: Makefile)
+    cmds:
+      - cmd: cmd /C "if not exist build mkdir build"
+        platforms: [windows]
+      - cmd: cmd /C "cd build && cmake -DCMAKE_PREFIX_PATH=C:\Qt\6.10.0\msvc2022_64 .."
+        platforms: [windows]
+      - cmd: cmd /C "cd build && cmake --build ."
+        platforms: [windows]
+      - cmd: make
+        platforms: [darwin, linux]
+    ignore_error: false
+
+  test:self:
+    desc: Run GoodASM self-tests (Windows native, POSIX Makefile)
+    cmds:
+      - cmd: >
+          cmd /C "if exist build\goodasm.exe build\goodasm.exe --test --ucom43 && build\goodasm.exe --test --6502 && build\goodasm.exe --test --marc4 && build\goodasm.exe --test --sm83 && build\goodasm.exe --test --tlcs47 && build\goodasm.exe --test --s2000 && build\goodasm.exe --test --8051 && build\goodasm.exe --test --6805 && build\goodasm.exe --test --chip8 && build\goodasm.exe --test --z80 && build\goodasm.exe --test --z8 && build\goodasm.exe --test --8080 && build\goodasm.exe --test --h83 else exit /b 1"
+        platforms: [windows]
+      - cmd: PATH="$(pwd)/build:$(pwd)/build/Debug:$PATH" make selftests
+        platforms: [darwin, linux]
+    ignore_error: false
+
+  test:fuzz:
+    desc: Run GoodASM fuzz tests (Windows native, POSIX Makefile)
+    cmds:
+      - cmd: >
+          cmd /C "if exist build\goodasm.exe build\goodasm.exe --fuzz --ucom43 && build\goodasm.exe --fuzz --6502 && build\goodasm.exe --fuzz --marc4 && build\goodasm.exe --fuzz --sm83 && build\goodasm.exe --fuzz --tlcs47 && build\goodasm.exe --fuzz --s2000 && build\goodasm.exe --fuzz --8051 && build\goodasm.exe --fuzz --6805 && build\goodasm.exe --fuzz --st7 && build\goodasm.exe --fuzz --chip8 && build\goodasm.exe --fuzz --z80 && build\goodasm.exe --fuzz --z8 && build\goodasm.exe --fuzz --8080 && build\goodasm.exe --fuzz --pic16c5x && build\goodasm.exe --fuzz --h83 && build\goodasm.exe --fuzz --arm7tdmi && build\goodasm.exe --fuzz -i else exit /b 1"
+        platforms: [windows]
+      - cmd: PATH="$(pwd)/build:$(pwd)/build/Debug:$PATH" make fuzz
+        platforms: [darwin, linux]
+    ignore_error: false
+
+  run:repl:
+    desc: |
+      Start GoodASM in interactive REPL mode (Windows: native, POSIX: Makefile build first)
+    cmds:
+      - task: build:cmake
+      - cmd: cmd /C "if exist build\goodasm.exe build\goodasm.exe --repl else (exit /b 1)"
+        platforms: [windows]
+      - cmd: ./build/goodasm --repl
+        platforms: [darwin, linux]
+    ignore_error: false
+
+  clean:
+    desc: |
+      Remove build artifacts (Windows: native, POSIX: Makefile)
+    cmds:
+      - cmd: cmd /C "if exist build rmdir /s /q build"
+        platforms: [windows]
+      - cmd: make clean
+        platforms: [darwin, linux]
+    ignore_error: true
+
+  default:
+    desc: Default build and test (cross-platform)
+    deps: [install:qt]
+    cmds:
+      - task: build:cmake
+      - task: test:self
+      - task: test:fuzz
+
+  all:
+    desc: Install dependencies, build, and test (cross-platform)
+    cmds:
+      - task: install:deps
+      - task: test:self
+      - task: test:fuzz
+
