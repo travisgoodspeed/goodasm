@@ -10,7 +10,7 @@
 // https://msyksphinz-self.github.io/riscv-isadoc/
 // Follow RISC-V Instruction Organization from the ISA Manual
 
-GALangRISCV::GALangRISCV() {
+GALangRISCV32::GALangRISCV32() {
     endian = LITTLE;
     name = "riscv32";
     maxbytes = 4; // Maximum instruction length (32-bit or 16-bit compressed)

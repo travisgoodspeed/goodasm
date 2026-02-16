@@ -313,7 +313,7 @@ int main(int argc, char *argv[]){
     else if(parser.isSet(langTI80))
         language="ti80";
     else if(parser.isSet(langRISCV))
-        language="riscv32";
+        language="riscv";
     else if(parser.isSet(langRISCV32))
         language="riscv32";
 

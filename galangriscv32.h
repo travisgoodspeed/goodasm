@@ -1,11 +1,14 @@
+#ifndef GALANGRISCV32_H
+#define GALANGRISCV32_H
+
 #include "galanguage.h"
 #include "gaparameter.h"
 #include "gamnemonic.h"
 
-class GALangRISCV : public GALanguage
+class GALangRISCV32 : public GALanguage
 {
 public:
-    GALangRISCV();
+    GALangRISCV32();
 };
 
 class GAParameterRiscvReg : public GAParameter {
@@ -339,3 +342,5 @@ public:
                 int inslen
                 ) override;
 };
+
+#endif // GALANGRISCV32_H
