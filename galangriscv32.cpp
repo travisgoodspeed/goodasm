@@ -787,19 +787,23 @@ GALangRISCV32::GALangRISCV32() {
         mnem("fence", 4,
              "\x0F\x00\xF0\x0F",    // pattern 32-bit LE: 0x0FF0000F (fence iorw, iorw)
              "\xFF\xFF\xFF\xFF"))  // exact match - no variable bits
+        ->prioritize() // Wins over parameterized fence during disassembly
         ->help("Memory Ordering Fence (full barrier): fence iorw, iorw")
         ->example("fence");
 
     // Fence with explicit pred/succ and registers
-    insert(
-        mnem("fence", 4,
-             "\x0F\x00\x00\x00",    // pattern 32-bit LE: 0x0000000F
-             "\x7F\x70\x00\x00"))   // mask: opcode + funct3
-        ->help("Memory Ordering Fence: orders memory operations")
-        ->example("fence #0xFF, zero, zero")
-        ->insert(new GAParameterRiscvFencePredSucc("\x00\x00\xF0\x0F")) // pred/succ in imm[7:0]
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")) // RS1: bits [19:15] (typically zero)
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7] (typically zero)
+    {
+        auto m = mnem("fence", 4,
+                     "\x0F\x00\x00\x00",    // pattern 32-bit LE: 0x0000000F
+                     "\x7F\x70\x00\x00");   // mask: opcode + funct3
+        m->help("Memory Ordering Fence: orders memory operations");
+        m->example("fence #0xFF, zero, zero");
+        m->insert(new GAParameterRiscvFencePredSucc("\x00\x00\xF0\x0F")); // pred/succ in imm[7:0]
+        m->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15] (typically zero)
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7] (typically zero)
+        m->dontcare("\x00\x00\x00\xF0"); // fm field (bits [31:28]) - fence mode, not used in standard fence
+        insert(m);
+    }
 
     /*
         * Example: FENCE.I
@@ -815,7 +819,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fence.i", 4,
              "\x0F\x10\x00\x00",    // pattern 32-bit LE: 0x0000100F
-             "\x7F\x70\x00\x00"))   // mask: opcode + funct3
+             "\xFF\xFF\xFF\xFF"))   // exact match - no variable bits (imm, rs1, rd all zero per spec)
         ->help("Instruction Fence: synchronizes instruction and data streams")
         ->example("fence.i");
     
@@ -836,25 +840,24 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("ecall", 4,
              "\x73\x00\x00\x00",    // pattern 32-bit LE: 0x00000073
-             "\x7F\x70\x10\x00"))   // mask: opcode + funct3 + imm[0] (bit 20 = byte 2 bit 4, must be 0)
+             "\xFF\xFF\xFF\xFF"))   // exact match - no variable bits (all fields zero per spec)
         ->help("Environment Call: makes a request to the execution environment")
         ->example("ecall");
 
     /*
         * Example: EBREAK
-        * 
+        *
         * Encoding:
         *   imm[11:0] rs1 funct3 rd opcode
         *
-        * Mask  :   0x0000707F  (mask funct3 + opcode)
         * Value :   0x00100073  (funct3=000 + opcode=0x73 + imm[0]=1)
-        * 
+        *
         * imm[0]=1 (bit 20), all other fields except funct3 and opcode are zero
         */
     insert(
         mnem("ebreak", 4,
              "\x73\x00\x10\x00",    // pattern 32-bit LE: 0x00100073 (imm[0]=1 in bit 20)
-             "\x7F\x70\x10\x00"))   // mask: opcode + funct3 + imm[0] (bit 20 = byte 2 bit 4)
+             "\xFF\xFF\xFF\xFF"))   // exact match - no variable bits (all fields zero per spec)
         ->help("Environment Break: causes a breakpoint exception")
         ->example("ebreak");
 
@@ -1028,15 +1031,18 @@ GALangRISCV32::GALangRISCV32() {
         * rl = 0 in bit [25]
         * rs2 = 00000 (reserved, must be zero) in bits [24:20]
         */
-    insert(
-        mnem("lr.w", 4,
-             "\x2F\x20\x00\x10",    // pattern 32-bit LE: 0x1000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5 (aq/rl default to 0)
-        ->help("Load Reserved Word: rd = M[rs1]; reserve address")
-        ->example("lr.w a0, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("lr.w", 4,
+                     "\x2F\x20\x00\x10",    // pattern 32-bit LE: 0x1000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Load Reserved Word: rd = M[rs1]; reserve address");
+        m->example("lr.w a0, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\xF0\x07"); // rs2[4:0] + aq + rl (bits [26:20]) unused in lr.w
+        insert(m);
+    }
 
     /*
         * Example: SC.W rd, rs2, (rs1)
@@ -1047,16 +1053,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0x1800202F  (funct5=00011, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("sc.w", 4,
-             "\x2F\x20\x00\x18",    // pattern 32-bit LE: 0x1800202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Store Conditional Word: if reserved, M[rs1] = rs2, rd = 0; else rd != 0")
-        ->example("sc.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("sc.w", 4,
+                     "\x2F\x20\x00\x18",    // pattern 32-bit LE: 0x1800202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Store Conditional Word: if reserved, M[rs1] = rs2, rd = 0; else rd != 0");
+        m->example("sc.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOSWAP.W rd, rs2, (rs1)
@@ -1067,16 +1076,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0x0800202F  (funct5=00001, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amoswap.w", 4,
-             "\x2F\x20\x00\x08",    // pattern 32-bit LE: 0x0800202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory Swap Word: temp = M[rs1]; M[rs1] = rs2; rd = temp")
-        ->example("amoswap.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amoswap.w", 4,
+                     "\x2F\x20\x00\x08",    // pattern 32-bit LE: 0x0800202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory Swap Word: temp = M[rs1]; M[rs1] = rs2; rd = temp");
+        m->example("amoswap.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOADD.W rd, rs2, (rs1)
@@ -1087,16 +1099,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0x0000202F  (funct5=00000, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amoadd.w", 4,
-             "\x2F\x20\x00\x00",    // pattern 32-bit LE: 0x0000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory Add Word: temp = M[rs1]; M[rs1] = temp + rs2; rd = temp")
-        ->example("amoadd.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amoadd.w", 4,
+                     "\x2F\x20\x00\x00",    // pattern 32-bit LE: 0x0000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory Add Word: temp = M[rs1]; M[rs1] = temp + rs2; rd = temp");
+        m->example("amoadd.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOXOR.W rd, rs2, (rs1)
@@ -1107,16 +1122,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0x2000202F  (funct5=00100, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amoxor.w", 4,
-             "\x2F\x20\x00\x20",    // pattern 32-bit LE: 0x2000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory XOR Word: temp = M[rs1]; M[rs1] = temp ^ rs2; rd = temp")
-        ->example("amoxor.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amoxor.w", 4,
+                     "\x2F\x20\x00\x20",    // pattern 32-bit LE: 0x2000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory XOR Word: temp = M[rs1]; M[rs1] = temp ^ rs2; rd = temp");
+        m->example("amoxor.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOAND.W rd, rs2, (rs1)
@@ -1127,16 +1145,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0x6000202F  (funct5=01100, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amoand.w", 4,
-             "\x2F\x20\x00\x60",    // pattern 32-bit LE: 0x6000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory AND Word: temp = M[rs1]; M[rs1] = temp & rs2; rd = temp")
-        ->example("amoand.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amoand.w", 4,
+                     "\x2F\x20\x00\x60",    // pattern 32-bit LE: 0x6000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory AND Word: temp = M[rs1]; M[rs1] = temp & rs2; rd = temp");
+        m->example("amoand.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOOR.W rd, rs2, (rs1)
@@ -1147,16 +1168,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0x4000202F  (funct5=01000, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amoor.w", 4,
-             "\x2F\x20\x00\x40",    // pattern 32-bit LE: 0x4000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory OR Word: temp = M[rs1]; M[rs1] = temp | rs2; rd = temp")
-        ->example("amoor.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amoor.w", 4,
+                     "\x2F\x20\x00\x40",    // pattern 32-bit LE: 0x4000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory OR Word: temp = M[rs1]; M[rs1] = temp | rs2; rd = temp");
+        m->example("amoor.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOMIN.W rd, rs2, (rs1)
@@ -1167,16 +1191,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0x8000202F  (funct5=10000, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amomin.w", 4,
-             "\x2F\x20\x00\x80",    // pattern 32-bit LE: 0x8000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory Minimum Word (signed): temp = M[rs1]; M[rs1] = min(temp, rs2); rd = temp")
-        ->example("amomin.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amomin.w", 4,
+                     "\x2F\x20\x00\x80",    // pattern 32-bit LE: 0x8000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory Minimum Word (signed): temp = M[rs1]; M[rs1] = min(temp, rs2); rd = temp");
+        m->example("amomin.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOMAX.W rd, rs2, (rs1)
@@ -1187,16 +1214,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0xA000202F  (funct5=10100, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amomax.w", 4,
-             "\x2F\x20\x00\xA0",    // pattern 32-bit LE: 0xA000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory Maximum Word (signed): temp = M[rs1]; M[rs1] = max(temp, rs2); rd = temp")
-        ->example("amomax.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amomax.w", 4,
+                     "\x2F\x20\x00\xA0",    // pattern 32-bit LE: 0xA000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory Maximum Word (signed): temp = M[rs1]; M[rs1] = max(temp, rs2); rd = temp");
+        m->example("amomax.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOMINU.W rd, rs2, (rs1)
@@ -1207,16 +1237,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0xC000202F  (funct5=11000, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amominu.w", 4,
-             "\x2F\x20\x00\xC0",    // pattern 32-bit LE: 0xC000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory Minimum Word (unsigned): temp = M[rs1]; M[rs1] = min(temp, rs2); rd = temp")
-        ->example("amominu.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amominu.w", 4,
+                     "\x2F\x20\x00\xC0",    // pattern 32-bit LE: 0xC000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory Minimum Word (unsigned): temp = M[rs1]; M[rs1] = min(temp, rs2); rd = temp");
+        m->example("amominu.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /*
         * Example: AMOMAXU.W rd, rs2, (rs1)
@@ -1227,16 +1260,19 @@ GALangRISCV32::GALangRISCV32() {
         * Mask  :   0xF8F0707F  (mask funct5 + aq + rl + funct3 + opcode)
         * Value :   0xE000202F  (funct5=11100, aq=0, rl=0, funct3=010, opcode=0x2F)
         */
-    insert(
-        mnem("amomaxu.w", 4,
-             "\x2F\x20\x00\xE0",    // pattern 32-bit LE: 0xE000202F
-             "\x7F\x70\x00\xF8"))   // mask: opcode + funct3 + funct5
-        ->help("Atomic Memory Maximum Word (unsigned): temp = M[rs1]; M[rs1] = max(temp, rs2); rd = temp")
-        ->example("amomaxu.w a0, a2, (a1)")
-        ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
-        ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20]
-        ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+    {
+        auto m = mnem("amomaxu.w", 4,
+                     "\x2F\x20\x00\xE0",    // pattern 32-bit LE: 0xE000202F
+                     "\x7F\x70\x00\xF8");   // mask: opcode + funct3 + funct5
+        m->help("Atomic Memory Maximum Word (unsigned): temp = M[rs1]; M[rs1] = max(temp, rs2); rd = temp");
+        m->example("amomaxu.w a0, a2, (a1)");
+        m->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")); // RD: bits [11:7]
+        m->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")); // RS2: bits [24:20]
+        m->group('(') // (rs1) group
+         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
+        m->dontcare("\x00\x00\x00\x06"); // aq + rl (bits [26:25]) unused
+        insert(m);
+    }
 
     /* ZICSR Instructions Extension */
 
@@ -1405,7 +1441,7 @@ GALangRISCV32::GALangRISCV32() {
         ->example("fsw f0, (#4, a1)")
         ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20] - byte 2 bits [7:4] + byte 3 bit [0]
         ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvStypeImm12("\x00\x00\xF0\xFE")) // imm[11:0]: split encoding
+        ->insert(new GAParameterRiscvStypeImm12("\x80\x0F\x00\xFE")) // imm[11:0] split encoding
         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
 
     /*
@@ -1576,7 +1612,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fsqrt.s", 4,
              "\x53\x00\x00\x58",    // pattern 32-bit LE: 0x58000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Square Root: rd = sqrt(rs1)")
         ->example("fsqrt.s f0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1746,7 +1782,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.w.s", 4,
              "\x53\x00\x00\xC0",    // pattern 32-bit LE: 0xC0000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert to Word: rd = (int32_t)rs1")
         ->example("fcvt.w.s a0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1764,7 +1800,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.wu.s", 4,
              "\x53\x10\x00\xC0",    // pattern 32-bit LE: 0xC0001053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert to Word Unsigned: rd = (uint32_t)rs1")
         ->example("fcvt.wu.s a0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1782,7 +1818,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.s.w", 4,
              "\x53\x00\x00\xD0",    // pattern 32-bit LE: 0xD0000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert from Word: rd = (float)rs1")
         ->example("fcvt.s.w f0, a1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1800,7 +1836,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.s.wu", 4,
              "\x53\x10\x00\xD0",    // pattern 32-bit LE: 0xD0001053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert from Word Unsigned: rd = (float)(uint32_t)rs1")
         ->example("fcvt.s.wu f0, a1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1818,7 +1854,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fmv.x.w", 4,
              "\x53\x00\x00\xE0",    // pattern 32-bit LE: 0xE0000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Move to Integer: rd = rs1 (bitwise copy)")
         ->example("fmv.x.w a0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1836,7 +1872,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fmv.w.x", 4,
              "\x53\x00\x00\xF0",    // pattern 32-bit LE: 0xF0000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Move from Integer: rd = rs1 (bitwise copy)")
         ->example("fmv.w.x f0, a1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1854,7 +1890,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fclass.s", 4,
              "\x53\x10\x00\xE0",    // pattern 32-bit LE: 0xE0001053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Classify: rd = classification bits for rs1")
         ->example("fclass.s a0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -1899,7 +1935,7 @@ GALangRISCV32::GALangRISCV32() {
         ->example("fsd f0, (#8, a1)")
         ->insert(new GAParameterRiscvReg("\x00\x00\xF0\x01")) // RS2: bits [24:20] - byte 2 bits [7:4] + byte 3 bit [0]
         ->group('(') // (rs1) group
-        ->insert(new GAParameterRiscvStypeImm12("\x00\x00\xF0\xFE")) // imm[11:0]: split encoding
+        ->insert(new GAParameterRiscvStypeImm12("\x80\x0F\x00\xFE")) // imm[11:0] split encoding
         ->insert(new GAParameterRiscvReg("\x00\x80\x0F\x00")); // RS1: bits [19:15]
 
     /*
@@ -2070,7 +2106,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fsqrt.d", 4,
              "\x53\x00\x00\x5A",    // pattern 32-bit LE: 0x5A000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Square Root Double: rd = sqrt(rs1)")
         ->example("fsqrt.d f0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2183,7 +2219,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.s.d", 4,
              "\x53\x00\x00\x40",    // pattern 32-bit LE: 0x40000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert Single from Double: rd = (float)rs1")
         ->example("fcvt.s.d f0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2201,7 +2237,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.d.s", 4,
              "\x53\x00\x00\x42",    // pattern 32-bit LE: 0x42000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert Double from Single: rd = (double)rs1")
         ->example("fcvt.d.s f0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2276,7 +2312,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.w.d", 4,
              "\x53\x00\x00\xC2",    // pattern 32-bit LE: 0xC2000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert to Word from Double: rd = (int32_t)rs1")
         ->example("fcvt.w.d a0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2294,7 +2330,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.wu.d", 4,
              "\x53\x10\x00\xC2",    // pattern 32-bit LE: 0xC2001053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert to Word Unsigned from Double: rd = (uint32_t)rs1")
         ->example("fcvt.wu.d a0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2312,7 +2348,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.d.w", 4,
              "\x53\x00\x00\xD2",    // pattern 32-bit LE: 0xD2000053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert from Word to Double: rd = (double)rs1")
         ->example("fcvt.d.w f0, a1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2330,7 +2366,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fcvt.d.wu", 4,
              "\x53\x10\x00\xD2",    // pattern 32-bit LE: 0xD2001053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Convert from Word Unsigned to Double: rd = (double)(uint32_t)rs1")
         ->example("fcvt.d.wu f0, a1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2348,7 +2384,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("fclass.d", 4,
              "\x53\x10\x00\xE2",    // pattern 32-bit LE: 0xE2001053
-             "\x7F\x70\x00\xFF"))   // mask: opcode + funct3 + funct7 + rs2
+             "\x7F\x70\xF0\xFF"))   // mask: opcode + funct3 + funct7 + rs2[4:0]
         ->help("Floating-Point Classify Double: rd = classification bits for rs1")
         ->example("fclass.d a0, f1")
         ->insert(new GAParameterRiscvReg("\x80\x0F\x00\x00")) // RD: bits [11:7]
@@ -2419,7 +2455,7 @@ GALangRISCV32::GALangRISCV32() {
     insert(
         mnem("c.nop", 2,
              "\x01\x00",        // pattern 16-bit LE: bits [1:0]=01, [15:13]=000, rd=0
-             "\x83\xEF"))       // mask: opcode + rd (byte0: bits [7] and [1:0]=0x83, byte1: bits [15:13] and [11:8]=0xEF)
+             "\xFF\xFF"))       // exact match - no variable bits (imm=0, rd=0 per spec)
         ->help("Compressed No Operation")
         ->example("c.nop");
     
@@ -2468,6 +2504,7 @@ GALangRISCV32::GALangRISCV32() {
         mnem("c.addi16sp", 2,
              "\x01\x61",        // pattern 16-bit LE: bits [1:0]=01, [15:13]=011, rd=2 (bits [11:8]=0001, bit [7]=0)
              "\x83\xEF"))       // mask: opcode + rd (byte0: bits [7] and [1:0]=0x83, byte1: bits [15:13] and [11:8]=0xEF)
+        ->prioritize() // More specific than c.lui (mask checks rd=2)
         ->help("Compressed Add Immediate to SP: sp = sp + (imm << 4)")
         ->example("c.addi16sp #-32")
         ->insert(new GAParameterRiscvCIimm6("\x7C\x10")); // imm[9|4|6|8:7|5]: split encoding (special format) - same mask as CI but different encoding logic
@@ -2519,8 +2556,9 @@ GALangRISCV32::GALangRISCV32() {
         mnem("c.ebreak", 2,
              "\x02\x90",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=001, rd=0, rs1=0
              "\xFF\xFF"))       // mask: all bits (0xFFFF) - c.ebreak is an exact encoding with rd=0, rs2=0
-        // Removed priority - full mask 0xFFFF ensures c.ebreak matches only its exact encoding 0x9002
-        ->help("Compressed Environment Break");
+        ->prioritize() // Exact match wins over c.add/c.jalr
+        ->help("Compressed Environment Break")
+        ->example("c.ebreak");
     
     /*
      * C.ANDI - Compressed AND Immediate
@@ -2590,6 +2628,7 @@ GALangRISCV32::GALangRISCV32() {
              "\x02\x90",        // pattern 16-bit LE: bits [1:0]=10, [15:12]=1001 (funct4), [6:2]=00000 (rs2=0)
              "\x7F\xF0"))       // mask: bits [6:0] in byte 0 (check rs2=0, op=10), bits [15:12] in byte 1 (check funct4)
         ->rejectWhenZero("\x80\x0F") // rs1 (bits [11:7]) must be non-zero
+        ->prioritize() // More specific than c.add (mask checks rs2=0)
         ->help("Compressed Jump and Link Register: ra = pc + 2; pc = rs1")
         ->example("c.jalr a0")
         ->insert(new GAParameterRiscvReg("\x80\x0F")); // rs1: bits [11:7] - bit [7] from byte 0, bits [11:8] from byte 1
@@ -2604,7 +2643,7 @@ GALangRISCV32::GALangRISCV32() {
         mnem("c.sub", 2,
              "\x02\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=00
              "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
-        // Removed priority - mask correctly checks [6:5]=00 to distinguish from other CA format instructions
+        ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed Subtract: rd' = rd' - rs2'")
         ->example("c.sub a0, a1")
         ->insert(new GAParameterRiscvCompReg("\x80\x03")) // rd': bits [9:7] - bit [7] from byte 0, bits [9:8] from byte 1
@@ -2620,7 +2659,7 @@ GALangRISCV32::GALangRISCV32() {
         mnem("c.xor", 2,
              "\x22\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=01
              "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
-        // Removed priority - mask correctly checks [6:5]=01 to distinguish from other CA format instructions
+        ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed XOR: rd' = rd' ^ rs2'")
         ->example("c.xor a0, a1")
         ->insert(new GAParameterRiscvCompReg("\x80\x03")) // rd': bits [9:7] - bit [7] from byte 0, bits [9:8] from byte 1
@@ -2636,7 +2675,7 @@ GALangRISCV32::GALangRISCV32() {
         mnem("c.or", 2,
              "\x42\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=10
              "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
-        // Removed priority - mask correctly checks [6:5]=10 to distinguish from other CA format instructions
+        ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed OR: rd' = rd' | rs2'")
         ->example("c.or a0, a1")
         ->insert(new GAParameterRiscvCompReg("\x80\x03")) // rd': bits [9:7] - bit [7] from byte 0, bits [9:8] from byte 1
@@ -2652,7 +2691,7 @@ GALangRISCV32::GALangRISCV32() {
         mnem("c.and", 2,
              "\x62\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=11
              "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
-        // Removed priority - mask correctly checks [6:5]=11 to distinguish from other CA format instructions
+        ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed AND: rd' = rd' & rs2'")
         ->example("c.and a0, a1")
         ->insert(new GAParameterRiscvCompReg("\x80\x03")) // rd': bits [9:7] - bit [7] from byte 0, bits [9:8] from byte 1
@@ -2766,7 +2805,7 @@ GALangRISCV32::GALangRISCV32() {
         mnem("c.add", 2,
              "\x02\x90",        // pattern 16-bit LE: bits [1:0]=10, [15:12]=1001 (funct4), rd=0 (template)
              "\x03\xF0"))       // mask: bits [1:0] + [15:12] = 0x03 in byte 0, 0xF0 in byte 1 (don't check rd or rs2)
-        // Removed priority - c.ebreak (inserted before this) has more specific mask (0x03FF) and will match first
+        ->rejectWhenZero("\x7C\x00") // rs2 (bits [6:2]) must be non-zero (rs2=0 is c.jalr or c.ebreak)
         ->help("Compressed Add: rd = rd + rs2")
         ->example("c.add a0, a1")
         ->insert(new GAParameterRiscvReg("\x80\x0F")) // rd: bits [11:7] - bit [7] from byte 0, bits [11:8] from byte 1
