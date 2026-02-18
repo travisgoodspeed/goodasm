@@ -63,6 +63,10 @@ int GAMnemonic::match(GAInstruction &ins, uint64_t adr, uint32_t &len,
             return 0; //No match.
     }
 
+    //Check reject-when-zero constraints (e.g., RISC-V c.addi requires rd != 0).
+    if(!passesRejectConstraints(bytes))
+        return 0;
+
     //Here we have a match, but we need to form a valid instructions.
     ins.verb=name;
     ins.type=GAInstruction::MNEMONIC;
@@ -170,4 +174,27 @@ GAMnemonic* GAMnemonic::example(QString example){
 GAMnemonic* GAMnemonic::prioritize(int priority){
     this->priority=priority;
     return this;
+}
+
+//Reject match if specified field is zero (for instruction disambiguation).
+GAMnemonic* GAMnemonic::rejectWhenZero(const char* mask){
+    QByteArray m;
+    for(uint32_t i = 0; i < length; i++)
+        m.append(mask[i]);
+    rejectZeroMasks.append(m);
+    return this;
+}
+
+//Helper to check reject-when-zero constraints.
+bool GAMnemonic::passesRejectConstraints(const char* bytes){
+    for(const auto& rzMask : rejectZeroMasks) {
+        bool fieldIsZero = true;
+        for(uint32_t i = 0; i < length && fieldIsZero; i++) {
+            if(bytes[i] & rzMask[i])
+                fieldIsZero = false;
+        }
+        if(fieldIsZero)
+            return false;  // Reject: field must be non-zero
+    }
+    return true;
 }
