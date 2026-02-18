@@ -2636,13 +2636,13 @@ GALangRISCV32::GALangRISCV32() {
     /*
      * C.SUB - Compressed Subtract
      * Format: CA
-     * Encoding: 100|rs2'[2:0]|rs2'[2:0]|11|rd'[2:0]|00|10
-     * Opcode: 0x8C02 (bits [1:0] = 10, bits [15:13] = 100, bits [12:10] = 111, bits [6:5] = 00)
+     * Encoding: 100011|rd'[2:0]|00|rs2'[2:0]|01
+     * Opcode: 0x8C01 (bits [1:0] = 01 (Q1), bits [15:10] = 100011 (funct6), bits [6:5] = 00 (funct2))
      */
     insert(
         mnem("c.sub", 2,
-             "\x02\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=00
-             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
+             "\x01\x8C",        // pattern 16-bit LE: bits [1:0]=01 (Q1), [15:10]=100011 (funct6), [6:5]=00 (funct2)
+             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:10] = 0x63 in byte 0, 0xFC in byte 1
         ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed Subtract: rd' = rd' - rs2'")
         ->example("c.sub a0, a1")
@@ -2652,13 +2652,13 @@ GALangRISCV32::GALangRISCV32() {
     /*
      * C.XOR - Compressed XOR
      * Format: CA
-     * Encoding: 100|rs2'[2:0]|rs2'[2:0]|11|rd'[2:0]|01|10
-     * Opcode: 0x8C22 (bits [1:0] = 10, bits [15:13] = 100, bits [12:10] = 111, bits [6:5] = 01)
+     * Encoding: 100011|rd'[2:0]|01|rs2'[2:0]|01
+     * Opcode: 0x8C21 (bits [1:0] = 01 (Q1), bits [15:10] = 100011 (funct6), bits [6:5] = 01 (funct2))
      */
     insert(
         mnem("c.xor", 2,
-             "\x22\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=01
-             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
+             "\x21\x8C",        // pattern 16-bit LE: bits [1:0]=01 (Q1), [15:10]=100011 (funct6), [6:5]=01 (funct2)
+             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:10] = 0x63 in byte 0, 0xFC in byte 1
         ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed XOR: rd' = rd' ^ rs2'")
         ->example("c.xor a0, a1")
@@ -2668,13 +2668,13 @@ GALangRISCV32::GALangRISCV32() {
     /*
      * C.OR - Compressed OR
      * Format: CA
-     * Encoding: 100|rs2'[2:0]|rs2'[2:0]|11|rd'[2:0]|10|10
-     * Opcode: 0x8C42 (bits [1:0] = 10, bits [15:13] = 100, bits [12:10] = 111, bits [6:5] = 10)
+     * Encoding: 100011|rd'[2:0]|10|rs2'[2:0]|01
+     * Opcode: 0x8C41 (bits [1:0] = 01 (Q1), bits [15:10] = 100011 (funct6), bits [6:5] = 10 (funct2))
      */
     insert(
         mnem("c.or", 2,
-             "\x42\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=10
-             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
+             "\x41\x8C",        // pattern 16-bit LE: bits [1:0]=01 (Q1), [15:10]=100011 (funct6), [6:5]=10 (funct2)
+             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:10] = 0x63 in byte 0, 0xFC in byte 1
         ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed OR: rd' = rd' | rs2'")
         ->example("c.or a0, a1")
@@ -2684,13 +2684,13 @@ GALangRISCV32::GALangRISCV32() {
     /*
      * C.AND - Compressed AND
      * Format: CA
-     * Encoding: 100|rs2'[2:0]|rs2'[2:0]|11|rd'[2:0]|11|10
-     * Opcode: 0x8C62 (bits [1:0] = 10, bits [15:13] = 100, bits [12:10] = 111, bits [6:5] = 11)
+     * Encoding: 100011|rd'[2:0]|11|rs2'[2:0]|01
+     * Opcode: 0x8C61 (bits [1:0] = 01 (Q1), bits [15:10] = 100011 (funct6), bits [6:5] = 11 (funct2))
      */
     insert(
         mnem("c.and", 2,
-             "\x62\x8C",        // pattern 16-bit LE: bits [1:0]=10, [15:13]=100, [12:10]=111, [6:5]=11
-             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:13] + [12:10] = 0x63 in byte 0, 0xFC in byte 1
+             "\x61\x8C",        // pattern 16-bit LE: bits [1:0]=01 (Q1), [15:10]=100011 (funct6), [6:5]=11 (funct2)
+             "\x63\xFC"))       // mask: bits [1:0] + [6:5] + [15:10] = 0x63 in byte 0, 0xFC in byte 1
         ->prioritize() // More specific than c.mv (mask checks funct6+funct2)
         ->help("Compressed AND: rd' = rd' & rs2'")
         ->example("c.and a0, a1")
