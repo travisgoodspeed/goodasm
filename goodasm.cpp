@@ -638,11 +638,9 @@ void GoodASM::loadFile(QString file){
     QByteArray bytes;
 
     QFile input(file);
-    if(file=="-")
-        input.open(stdin, QIODevice::ReadOnly);
-    else
-        input.open(QFile::ReadOnly);
-    bytes=input.readAll();
+    if((file=="-" && input.open(stdin, QIODevice::ReadOnly))
+         || input.open(QFile::ReadOnly))
+        bytes=input.readAll();
     if(bytes.length()==0)
         exit(1);
 
@@ -656,11 +654,9 @@ void GoodASM::loadBinFile(QString file){
     QByteArray bytes;
 
     QFile input(file);
-    if(file=="-")
-        input.open(stdin, QIODevice::ReadOnly);
-    else
-        input.open(QFile::ReadOnly);
-    bytes=input.readAll();
+    if((file=="-" && input.open(stdin, QIODevice::ReadOnly))
+        || input.open(QFile::ReadOnly))
+        bytes=input.readAll();
     if(bytes.length()==0)
         exit(1);
 
@@ -671,11 +667,9 @@ void GoodASM::loadDamageFile(QString file){
     QByteArray bytes;
 
     QFile input(file);
-    if(file=="-")
-        input.open(stdin, QIODevice::ReadOnly);
-    else
-        input.open(QFile::ReadOnly);
-    bytes=input.readAll();
+    if((file=="-" && input.open(stdin, QIODevice::ReadOnly))
+        || input.open(QFile::ReadOnly))
+        bytes=input.readAll();
     if(bytes.length()==0)
         exit(1);
 

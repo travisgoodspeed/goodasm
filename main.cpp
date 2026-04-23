@@ -316,7 +316,7 @@ int main(int argc, char *argv[]){
         if(!okay){
             qDebug()<<"Can't parse base address: "<<parser.value(baseOption);
             qDebug()<<"Thought it was "<<Qt::hex<<base;
-            return 1;
+            exit(1);
         }
         goodasm->baseaddress=base;
     }
@@ -357,11 +357,11 @@ int main(int argc, char *argv[]){
 
     if(parser.isSet(cheatOption)){
         std::cout<<lang->cheatSheet().toStdString();
-        return 0;
+        exit(1);
     }
     if(parser.isSet(opcodetableOption)){
         std::cout<<goodasm->opcodeTable().toStdString();
-        return 0;
+        exit(0);
     }
 
     //Selftest returns a code for integration testing.
@@ -417,21 +417,25 @@ int main(int argc, char *argv[]){
 
         if(parser.isSet(outOption)){
             QFile out(parser.value(outOption));
-            if(args[0]=="-")
-                out.open(stdout, QIODevice::WriteOnly);
-            else
-                out.open(QFile::WriteOnly);
-            out.write(goodasm->code());
-            out.close();
+            if( (args[0]=="-" && out.open(stdout, QIODevice::WriteOnly))
+                || out.open(QFile::WriteOnly)){
+                out.write(goodasm->code());
+                out.close();
+            }else{
+                qDebug()<<"Error opening "<<parser.value(outOption);
+                exit(1);
+            }
         }
         if(parser.isSet(symboltableOption)){
             QFile stfile(parser.value(symboltableOption));
-            if(args[0]=="-")
-                stfile.open(stdout, QIODevice::WriteOnly);
-            else
-                stfile.open(QFile::WriteOnly);
-            stfile.write(goodasm->symbols.exportTable().toStdString().c_str());
-            stfile.close();
+            if( (args[0]=="-" && stfile.open(stdout, QIODevice::WriteOnly))
+                || stfile.open(QFile::WriteOnly)){
+                stfile.write(goodasm->symbols.exportTable().toStdString().c_str());
+                stfile.close();
+            }else{
+                qDebug()<<"Error opening "<<parser.value(symboltableOption);
+                exit(1);
+            }
         }
 
         //Sometimes we don't define all symbols.  This is really bad.
