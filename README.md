@@ -47,27 +47,104 @@ check the issue tracker for their status.
 Source code and binaries were publicly released at
 [DistrictCon](https://www.districtcon.org/) on Feb 21, 2025.
 
-## Building
+## Building and Automation
 
-For GUI development, install the [Qt Dev
-Kit](https://www.qt.io/download-qt-installer-oss) and then open
-`CMakefile.txt` in Qt Creator.  On Windows, you must also install the
-[Git](https://git-scm.com/downloads/win) client; Github Desktop is not
-enough on its own.
+This project supports robust, cross-platform build and test automation using both a top-level `Makefile` (for Linux/macOS and advanced users) and a [Taskfile.yml](https://taskfile.dev) for [Go Task](https://taskfile.dev) (especially recommended for Windows users). The automation ensures all dependencies are installed, including CMake, Qt, Git, NASM, unidasm, and YARA-X (`yr`).
 
-To build in Linux, first install `qt6-declarative-dev`, `qml6-module-\*`, `git`
-and `cmake`, then run the following:
+### Recommended: Go Task (Windows & Cross-Platform)
+
+The preferred way to build and test GoodASM on Windows (and optionally on Linux/macOS) is via Go Task:
+
+### Ensuring Go Task is Installed
+
+If you do not already have [Go Task](https://taskfile.dev) installed:
+
+- **On Windows:**
+  - Since `make` is not available by default, run the script directly:
+    ```cmd
+    ensure_task.cmd
+    ```
+- **On Linux/macOS:**
+  - Run:
+    ```sh
+    make ensure_task
+    ```
+
+The scripts are located at:
+- `ensure_task.cmd` (Windows)
+- `ensure_task.sh` (Linux/macOS)
+
+These scripts will attempt to install Go Task if it is missing, ensuring that all automation commands are available.
+
+
+### Recommended: Go Task (Windows & Cross-Platform)
+
+The preferred way to build and test GoodASM on Windows (and optionally on Linux/macOS) is via Go Task:
+
+1. In a terminal, run:
+   ```cmd
+   task all
+   ```
+   This will:
+   - Install CMake, Qt, Git, NASM, unidasm, and YARA-X (`yr`) if not already present
+   - Build the project (using CMake or Makefile as appropriate)
+   - Run all self-tests
+
+You can also run individual tasks, e.g. `task build:cmake` or `task run:repl`. Run `task --list` to see all available tasks.
+
+### Makefile (Linux/macOS & Advanced)
+
+The top-level `Makefile` is the single source of truth for build and test logic on POSIX systems. It:
+
+- Installs all required dependencies (Qt5, pkg-config, SDL2_ttf, unidasm, YARA-X)
+- Builds the project and runs all tests
+- Builds and installs the MAME unidasm tool and YARA-X (`yr`) automatically
+
+To build and test on Linux/macOS:
+
+```sh
+make qt5deps        # Installs all dependencies, including YARA-X (yr)
+make                # Builds and runs all tests
 ```
-git clone https://github.com/travisgoodspeed/goodasm
-cd goodasm
-mkdir build
-cd build
-cmake ..
-make -j 8 clean all
+
+You can also use `make unidasm` to build and install the MAME unidasm tool, or `make clean` to remove build artifacts.
+
+#### Note on YARA-X
+
+The test infrastructure uses [YARA-X](https://github.com/VirusTotal/yara-x) (`yr`), not classic YARA. The Makefile will automatically build and install YARA-X if it is not present.
+
+#### Windows Manual Build
+
+For GUI development, install the [Qt Dev Kit](https://www.qt.io/download-qt-installer-oss) and open `CMakeLists.txt` in Qt Creator. You must also install [Git](https://git-scm.com/downloads/win); Github Desktop is not enough.
+
+You can also run individual tasks, e.g. `task build:cmake` or `task run:repl`. Run `task --list` to see all available tasks.
+
+### Makefile (Linux/macOS & Advanced)
+
+The top-level `Makefile` is the single source of truth for build and test logic on POSIX systems. It:
+
+- Installs all required dependencies (Qt5, pkg-config, SDL2_ttf, unidasm, YARA-X)
+- Builds the project and runs all tests
+- Builds and installs the MAME unidasm tool and YARA-X (`yr`) automatically
+
+To build and test on Linux/macOS:
+
+```sh
+make qt5deps        # Installs all dependencies, including YARA-X (yr)
+make                # Builds and runs all tests
 ```
 
-The preferred executable is `goodasm`.  The GUI for iOS and Android is
-more of a fun toy than a tool.
+You can also use `make unidasm` to build and install the MAME unidasm tool, or `make clean` to remove build artifacts.
+
+#### Note on YARA-X
+
+The test infrastructure uses [YARA-X](https://github.com/VirusTotal/yara-x) (`yr`), not classic YARA. The Makefile will automatically build and install YARA-X if it is not present.
+
+#### Windows Manual Build
+
+For GUI development, install the [Qt Dev Kit](https://www.qt.io/download-qt-installer-oss) and open `CMakeLists.txt` in Qt Creator. You must also install [Git](https://git-scm.com/downloads/win); Github Desktop is not enough.
+
+---
 
 ## Examples
 
@@ -304,6 +381,16 @@ interactive mode for iOS and Android.  Please don't do real work this
 way, but it's handy when studying an instruction set with pen and
 paper, away from a real laptop.
 
+### Exiting the REPL
+
+To exit the GoodASM interactive REPL:
+
+- On **Windows**: Press `Ctrl+Z` then Enter
+- On **Linux/macOS**: Press `Ctrl+D`
+- Or use `Ctrl+C` to interrupt/terminate the REPL
+
+There are no built-in `.exit` or `.quit` commands; only EOF or interrupt will exit the REPL.
+
 ## Identification and Grading
 
 It's a frequent problem in embedded systems reverse engineering that
@@ -509,7 +596,6 @@ source of examples for using the library.
 `gaparser.cpp` for parsing.  Parsing is very strictly shared by all
 languages, so that someday the parser can be rewritten without
 breaking code compatibility.
-
 
 ## Similar Assembler/Disassemblers
 
