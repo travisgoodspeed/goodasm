@@ -1,0 +1,14 @@
+.lang riscv32
+.org 0x0
+
+c.addi16sp #-512
+c.addi16sp #-256
+c.addi16sp #-128
+c.addi16sp #-64
+c.addi16sp #-32
+c.addi16sp #32
+c.addi16sp #64
+c.addi16sp #128
+c.addi16sp #256
+c.addi16sp #496
+

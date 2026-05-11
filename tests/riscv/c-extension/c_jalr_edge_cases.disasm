@@ -1,0 +1,17 @@
+c.jalr a0
+c.jalr a1
+c.jalr a2
+c.jalr a3
+c.jalr a4
+c.jalr a5
+c.jalr a6
+c.jalr a7
+c.jalr s0
+c.jalr s1
+c.jalr t0
+c.jalr t1
+c.jalr t2
+c.jalr ra
+c.jalr sp
+c.jalr gp
+c.jalr tp

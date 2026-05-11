@@ -3,6 +3,8 @@
 
 #include <QString>
 #include <QVector>
+#include <QList>
+#include <QByteArray>
 #include "gaparameter.h"
 #include "gaparser.h"
 
@@ -41,6 +43,10 @@ public:
     GAMnemonic* prioritize(int priority=1);
     int priority=0;
 
+    //Reject match if specified field is zero (for instruction disambiguation).
+    GAMnemonic* rejectWhenZero(const char* mask);
+    QList<QByteArray> rejectZeroMasks;
+
 
     //Short help string for the cheat sheet.
     GAMnemonic* help(QString help);
@@ -75,6 +81,8 @@ private:
     void config(QString mnemonic, uint32_t length,
                 const char *opcode,
                 const char *opcodemask, const char *invertmask);
+    //Helper to check reject-when-zero constraints.
+    bool passesRejectConstraints(const char* bytes);
 };
 
 #endif // GAMNEMONIC_H
